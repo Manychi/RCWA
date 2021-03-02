@@ -1,3 +1,4 @@
+# testing GIT2
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
@@ -14,7 +15,6 @@ e0 = 1; e1 = 2;                 # Dielectric permitivity of surrounding medium a
 N = 3;                         # Number of harmonics
 Nl = 5;                         # Number of layers
 
-# testing GIT
 # Geometry definition
 alpha_lrad = alpha_l*PI/180; alpha_rrad = alpha_r*PI/180;   # Convert angles to radians
 H  = (p-d)/(1/np.tan(alpha_lrad)+1/np.tan(alpha_rrad))      # Height of grating
