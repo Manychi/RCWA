@@ -42,7 +42,7 @@ plt.show()                      # Show plot
 A = np.array([[1,1,3],[3,1,1],[1,3,1]]); #initiates the array, should load from script
 
 #print(A)
-#Build W, and Q
+#Build W, and Q for a loop of A, for each layer
 Q, W = np.linalg.eig(A);                 # W = eigen vector, Q = eigen values
 
 #Build X-matrix
@@ -55,6 +55,4 @@ for i in range(N-1): #Provide range
   #  T_1_inv = np.linalg.inv(T_1)
   #  T_2     = np.array([[ W[i]*X[i], W[i]],     [W[i]*Q[i]*X[i], -1*W[i]*Q[i]]])
     
-#find c2 in next layer from c1
-
 #Build S-Matrix from given  total T matrix
