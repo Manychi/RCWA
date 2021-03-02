@@ -73,5 +73,17 @@ for i in range(Nl):                                         # For every layer
     Earray = e0*integral(-p/2,Sl[i])+e1*integral(Sl[i],Sr[i])+e0*integral(Sr[i],p/2) # Calculate the complete integral for the three regions
     A[:,:,i] = ArraysToA(Earray,Kx2)                        # Convert to a matrix form where last index is the layer number
 
+# Find 
+Q, W = np.linalg.eig(A);  
 
+#Build X-matrix
+X = np.exp(-k_0*Q*Hs)  # X is now filled per layer for every
+
+#initiate T matrix from W, X and Q
+for i in range(N-1): #Provide range
+    T_1     = np.array([[W[i+1],W[i+1]*X[i+1]], [W[i+1]*Q[1,i+1], -W[i+1]*Q[i+1]*X[i+1]]])
+  #  T_1_inv = np.linalg.inv(T_1)
+  #  T_2     = np.array([[ W[i]*X[i], W[i]],     [W[i]*Q[i]*X[i], -1*W[i]*Q[i]]])
+    
+#Build S-Matrix from given  total T matrix
 
