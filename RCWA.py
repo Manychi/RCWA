@@ -14,6 +14,7 @@ e0 = 1; e1 = 2;                 # Dielectric permitivity of surrounding medium a
 N = 3;                         # Number of harmonics
 Nl = 5;                         # Number of layers
 
+# testing GIT
 # Geometry definition
 alpha_lrad = alpha_l*PI/180; alpha_rrad = alpha_r*PI/180;   # Convert angles to radians
 H  = (p-d)/(1/np.tan(alpha_lrad)+1/np.tan(alpha_rrad))      # Height of grating
@@ -37,7 +38,6 @@ for i in range(Nl):             # Draw the rectangular slices
     
 plt.show()                      # Show plot
 
-
 #inputs for S-Matrix;
 A = np.array([[1,1,3],[3,1,1],[1,3,1]]); #initiates the array, should load from script
 
@@ -56,3 +56,4 @@ for i in range(N-1): #Provide range
   #  T_2     = np.array([[ W[i]*X[i], W[i]],     [W[i]*Q[i]*X[i], -1*W[i]*Q[i]]])
     
 #Build S-Matrix from given  total T matrix
+#testje
