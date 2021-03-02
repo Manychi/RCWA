@@ -37,9 +37,6 @@ for i in range(Nl):             # Draw the rectangular slices
     
 plt.show()                      # Show plot
 
-C = 1
-print(C)
-
 #inputs for S-Matrix;
 A = np.array([[1,1,3],[3,1,1],[1,3,1]]); #initiates the array, should load from script
 
