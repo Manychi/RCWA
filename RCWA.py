@@ -52,7 +52,7 @@ def integral(boundaryl,boundaryr):                          # Inputs are the lef
             result[n+2*N] = np.exp(-2j*PI*n*boundaryl/p)*p*1j/(2*PI*n)
             - np.exp(-2j*PI*n*boundaryr/p)*p*1j/(2*PI*n)    # Calculating the integral
         else:
-            result[n+2*N] = 0                               # In case n is equal to zero do something??
+            result[n+2*N] = boundaryl -boundaryr            # In case n is equal to zero integral is over a constant
     return result                                           # Return the resulting array
 
 # Function to get the Kx2 and Earrays in a matrix form
