@@ -11,8 +11,8 @@ theta_inc = 0; lambda_0 = 20;   # Angle of incidence and wavelength of incident 
 p = 1;                          # Grating period
 alpha_l = 30; alpha_r = 50;     # Blazing and anti-blazing angle in degrees
 d = 0.5;                        # Width of top cut
-e0 = 1; e1 = 2;                 # Dielectric permitivity of surrounding medium and grating
-N = 100;                         # Number of harmonics
+e0 = 8.85; e1 = 2;                 # Dielectric permitivity of surrounding medium and grating
+N = 10;                         # Number of harmonics
 Nl = 50;                         # Number of layers
 
 # Geometry definition
@@ -68,22 +68,49 @@ def ArraysToA(Earray,Kx2):
     return A  # Return the A matrix for that layer as defined in the slides
 
 # Find the Ai matrix for all layers i
+
 A = np.zeros((2*N+1,2*N+1,Nl), dtype=np.cdouble)            # Memory allocation
 for i in range(Nl):                                         # For every layer
     Earray = e0*integral(-p/2,Sl[i])+e1*integral(Sl[i],Sr[i])+e0*integral(Sr[i],p/2) # Calculate the complete integral for the three regions
     A[:,:,i] = ArraysToA(Earray,Kx2)                        # Convert to a matrix form where last index is the layer number
 
-# Find 
-Q, W = np.linalg.eig(A);  
+# Find eigen vector,W, and values,Q, for each layer
+Q = np.zeros((2*N+1,2*N+1,Nl), dtype=np.cdouble)        #Memory allocation for Q
+W = Q #Memory allocation for W
+X = Q               # Memory allocation for X                                      
+for i in range(Nl): # For every layer 
+    Q[:,:,i], W[:,:,i] = np.linalg.eig(A[:,:,i]) # Computes eigen value and vector for every layer matrix A
 
 #Build X-matrix
-X = np.exp(-k_0*Q*Hs)  # X is now filled per layer for every
+X = np.exp(-k_0*Q*Hs)  # X is now filled per layer for Q
 
-#initiate T matrix from W, X and Q
-for i in range(N-1): #Provide range
-    T_1     = np.array([[W[i+1],W[i+1]*X[i+1]], [W[i+1]*Q[1,i+1], -W[i+1]*Q[i+1]*X[i+1]]])
-  #  T_1_inv = np.linalg.inv(T_1)
-  #  T_2     = np.array([[ W[i]*X[i], W[i]],     [W[i]*Q[i]*X[i], -1*W[i]*Q[i]]])
+# T matrix solution
+ 
+#memory allocation
+
+T_full = np.zeros((2*N+1, 2*N+1, Nl, Nl), dtype=np.cdouble)
+
+for i in range(Nl-1):
+     
+    #Different vector initialization
+    T11 = W[:,:,i+1]            #proceeding layer W
+    T12 = W[:,:,i]              #current layer W
+    T21 = W[:,:,i+1]*Q[:,:,i+1] #proceeding layer W and Q
+    T22 = -W[:,:,i]*Q[:,:,i]    #current layer W and Q
     
+    #Parts of T to find T total for each layer
+    T_Matrix_1 = np.array([[np.identity(Nl),0],[0,np.linalg.inv(X[:,:,i+1])]])
+    T_Matrix_2 = np.linalg.inv(np.array([[T11,T11],[T21,-T21]]))
+    T_Matrix_3 = np.array([[T12,T12],[T22,-T22]])
+    T_Matrix_4 = np.array([[X[:,:,i],0],[0,np.identity(Nl)]])
+    
+    T_M2_hand  = 1/(T11*-T21-T11*T21)*np.array([[T11,-T11],[-T21,-T21]])
+    
+    T_full2    = T_Matrix_1*T_M2_hand
+    
+    T_full[:,:,i]     = T_Matrix_1*T_Matrix_2#*T_Matrix_3*T_Matrix_4
+            
+why = np.array([[2,2],[1,4]])
+Wwhy, Qwhy = np.linalg.eig(why)
 #Build S-Matrix from given  total T matrix
 
