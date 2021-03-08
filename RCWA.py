@@ -2,18 +2,18 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
-import scipy
+import scipy as sp
 
 PI = 3.14159265359
 
 # Inputs
 theta_inc = 0; lambda_0 = 20;   # Angle of incidence and wavelength of incident light
-p = 1;                          # Grating period
+p = 50;                          # Grating period
 alpha_l = 30; alpha_r = 50;     # Blazing and anti-blazing angle in degrees
 d = 0.5;                        # Width of top cut
-e0 = 8.85; e1 = 2;                 # Dielectric permitivity of surrounding medium and grating
+e0 = 1; e1 = 2;                 # Dielectric permitivity of surrounding medium and grating
 N = 10;                         # Number of harmonics
-Nl = 50;                         # Number of layers
+Nl = 10;                         # Number of layers
 
 # Geometry definition
 alpha_lrad = alpha_l*PI/180; alpha_rrad = alpha_r*PI/180;   # Convert angles to radians
@@ -62,7 +62,7 @@ def ArraysToA(Earray,Kx2):
         if i < 2*N:
             np.fill_diagonal(A[2*N-i:], -Earray[i]);
         elif i == 2*N:
-            np.fill_diagonal(A, Kx2[i]-Earray[i]);
+            np.fill_diagonal(A, Kx2-Earray[i]);
         else:
             np.fill_diagonal(A[:,i-2*N:], -Earray[i]);
     return A  # Return the A matrix for that layer as defined in the slides
@@ -71,46 +71,53 @@ def ArraysToA(Earray,Kx2):
 
 A = np.zeros((2*N+1,2*N+1,Nl), dtype=np.cdouble)            # Memory allocation
 for i in range(Nl):                                         # For every layer
-    Earray = e0*integral(-p/2,Sl[i])+e1*integral(Sl[i],Sr[i])+e0*integral(Sr[i],p/2) # Calculate the complete integral for the three regions
+    Earray = e0*integral(-p/2,Sl[i])+e1*e0*integral(Sl[i],Sr[i])+e0*integral(Sr[i],p/2) # Calculate the complete integral for the three regions
     A[:,:,i] = ArraysToA(Earray,Kx2)                        # Convert to a matrix form where last index is the layer number
 
 # Find eigen vector,W, and values,Q, for each layer
-Q = np.zeros((2*N+1,2*N+1,Nl), dtype=np.cdouble)        #Memory allocation for Q
-W = Q #Memory allocation for W
-X = Q               # Memory allocation for X                                      
+Q = np.zeros((2*N+1,Nl),      dtype = np.cdouble)     #Memory allocation for Q
+W = np.zeros((2*N+1,2*N+1,Nl),dtype = np.cdouble)     #Memory allocation for W
+X = Q               # Memory allocation for X    
+                                  
 for i in range(Nl): # For every layer 
-    Q[:,:,i], W[:,:,i] = np.linalg.eig(A[:,:,i]) # Computes eigen value and vector for every layer matrix A
-
+    Q[:,i], W[:,:,i] = np.linalg.eig(A[:,:,i]) # Computes eigen value and vector for every layer matrix A
+ 
 #Build X-matrix
-X = np.exp(-k_0*Q*Hs)  # X is now filled per layer for Q
+X = np.exp(-k_0*Q*Hs)
+
+  # X is now filled per layer for Q
 
 # T matrix solution
  
 #memory allocation
 
-T_full = np.zeros((2*N+1, 2*N+1, Nl, Nl), dtype=np.cdouble)
-
+T_full = np.zeros((2*N+1, 2*N+1, Nl), dtype=np.cdouble)
+X_full = np.zeros((2*N+1, 2*N+1), dtype=np.cdouble)
+T_Matrix_2_intermediate = np.zeros((2*N+1, 2*N+1,Nl),dtype=np.cdouble)
 for i in range(Nl-1):
      
     #Different vector initialization
     T11 = W[:,:,i+1]            #proceeding layer W
     T12 = W[:,:,i]              #current layer W
-    T21 = W[:,:,i+1]*Q[:,:,i+1] #proceeding layer W and Q
-    T22 = -W[:,:,i]*Q[:,:,i]    #current layer W and Q
-    
+    T21 = np.matmul(W[:,:,i+1],Q[:,i+1])   #proceeding layer W and Q
+    T22 = np.matmul(W[:,:,i],Q[:,i])      #current layer W and Q
+   
     #Parts of T to find T total for each layer
-    T_Matrix_1 = np.array([[np.identity(Nl),0],[0,np.linalg.inv(X[:,:,i+1])]])
-    T_Matrix_2 = np.linalg.inv(np.array([[T11,T11],[T21,-T21]]))
-    T_Matrix_3 = np.array([[T12,T12],[T22,-T22]])
-    T_Matrix_4 = np.array([[X[:,:,i],0],[0,np.identity(Nl)]])
+    # T_Matrix_1 = np.array([[np.identity(Nl),0],[0,np.linalg.inv(np.diag(X[:,i+1]))]])
+    # T_Matrix_2_intermediate = np.array([[T11,T11],[T21,-T21]])
+    # T_Matrix_2 = np.linalg.inv(T_Matrix_2_intermediate)
+    # T_Matrix_3 = np.array([[T12,T12],[T22,-T22]])
+    # T_Matrix_4 = np.array([[X[:,i],0],[0,np.identity(Nl)]])
     
-    T_M2_hand  = 1/(T11*-T21-T11*T21)*np.array([[T11,-T11],[-T21,-T21]])
+    # T_M2_hand  = 1/(T11*-T21-T11*T21)*np.array([[T11,-T11],[-T21,-T21]])
+    # T_full     = np.matmul(np.matmul(T_Matrix_1,T_Matrix_2),np.matmul(T_Matrix_3,T_Matrix_4))
     
-    T_full2    = T_Matrix_1*T_M2_hand
+    T_Part_1 = np.linalg.inv(np.array([[T11, np.matmul(T11,X[:,i+1])], 
+                                        [T21, np.matmul(-T21,X[:,i+1])]]))
+    T_Part_2 = np.array([[np.matmul(T12,X[:,i]),T12],[np.matmul(T12,X[:,i]),T12]])
+    T_full   = np.multiply(T_Part_1,T_Part_2)
     
-    T_full[:,:,i]     = T_Matrix_1*T_Matrix_2#*T_Matrix_3*T_Matrix_4
+    #*T_Matrix_3*T_Matrix_4
             
-why = np.array([[2,2],[1,4]])
-Wwhy, Qwhy = np.linalg.eig(why)
 #Build S-Matrix from given  total T matrix
 
