@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
+from functools import reduce # only in Python 3
 import scipy as sp
 
 PI = 3.14159265359
@@ -13,7 +14,8 @@ alpha_l = 30; alpha_r = 50;     # Blazing and anti-blazing angle in degrees
 d = 0.5;                        # Width of top cut
 e0 = 1; e1 = 2;                 # Dielectric permitivity of surrounding medium and grating
 N = 10;                         # Number of harmonics
-Nl = 10;                         # Number of layers
+Nl = 10;                        # Number of layers excluding sub- and superstrate layers
+Nlt = Nl+2;                     # Total number of layers including sub- and superstrate layers
 
 # Geometry definition
 alpha_lrad = alpha_l*PI/180; alpha_rrad = alpha_r*PI/180;   # Convert angles to radians
@@ -68,11 +70,13 @@ def ArraysToA(Earray,Kx2):
     return A  # Return the A matrix for that layer as defined in the slides
 
 # Find the Ai matrix for all layers i
+A = np.zeros((2*N+1,2*N+1,Nlt), dtype=np.cdouble)             # Memory allocation
+A[:,:,0] = ArraysToA(e0*integral(-p/2,p/2),Kx2)               # Determine A in the superstrate
+A[:,:,Nlt-1] = ArraysToA(e1*integral(-p/2,p/2),Kx2)           # Determine A in the substrate
 
-A = np.zeros((2*N+1,2*N+1,Nl), dtype=np.cdouble)            # Memory allocation
-for i in range(Nl):                                         # For every layer
-    Earray = e0*integral(-p/2,Sl[i])+e1*e0*integral(Sl[i],Sr[i])+e0*integral(Sr[i],p/2) # Calculate the complete integral for the three regions
-    A[:,:,i] = ArraysToA(Earray,Kx2)                        # Convert to a matrix form where last index is the layer number
+for i in range(Nl):                                           # For every layer in the geometry
+    Earray = e0*integral(-p/2,Sl[i])+e1*integral(Sl[i],Sr[i])+e0*integral(Sr[i],p/2) # Calculate the complete integral for the three regions
+    A[:,:,i+1] = ArraysToA(Earray,Kx2)                        # Convert to a matrix form where last index is the layer number
 
 # Find eigen vector,W, and values,Q, for each layer
 Q = np.zeros((2*N+1,Nl),      dtype = np.cdouble)     #Memory allocation for Q
@@ -85,39 +89,58 @@ for i in range(Nl): # For every layer
 #Build X-matrix
 X = np.exp(-k_0*Q*Hs)
 
-  # X is now filled per layer for Q
+Tsubi = np.zeros((4*N+2, 4*N+2), dtype=np.cdouble)
+Tsubi1 = np.zeros((4*N+2, 4*N+2), dtype=np.cdouble)
 
-# T matrix solution
- 
-#memory allocation
-
-T_full = np.zeros((2*N+1, 2*N+1, Nl), dtype=np.cdouble)
-X_full = np.zeros((2*N+1, 2*N+1), dtype=np.cdouble)
-T_Matrix_2_intermediate = np.zeros((2*N+1, 2*N+1,Nl),dtype=np.cdouble)
-for i in range(Nl-1):
-     
-    #Different vector initialization
-    T11 = W[:,:,i+1]            #proceeding layer W
-    T12 = W[:,:,i]              #current layer W
-    T21 = np.matmul(W[:,:,i+1],Q[:,i+1])   #proceeding layer W and Q
-    T22 = np.matmul(W[:,:,i],Q[:,i])      #current layer W and Q
-   
-    #Parts of T to find T total for each layer
-    # T_Matrix_1 = np.array([[np.identity(Nl),0],[0,np.linalg.inv(np.diag(X[:,i+1]))]])
-    # T_Matrix_2_intermediate = np.array([[T11,T11],[T21,-T21]])
-    # T_Matrix_2 = np.linalg.inv(T_Matrix_2_intermediate)
-    # T_Matrix_3 = np.array([[T12,T12],[T22,-T22]])
-    # T_Matrix_4 = np.array([[X[:,i],0],[0,np.identity(Nl)]])
+def Tmatrix(Wi,Qi,Wi1,Qi1):
+    for i in range(2*N+1):
+        for j in range(2*N+1):
+            Tsubi[i,j] = Wi[i,j]
+            Tsubi[i,j+2*N+1] = Wi[i,j]
+            Tsubi[i+2*N+1,j] = Wi[i,j]*Qi[i]
+            Tsubi[i+2*N+1,j+2*N+1] = -Wi[i,j]*Qi[i]
     
-    # T_M2_hand  = 1/(T11*-T21-T11*T21)*np.array([[T11,-T11],[-T21,-T21]])
-    # T_full     = np.matmul(np.matmul(T_Matrix_1,T_Matrix_2),np.matmul(T_Matrix_3,T_Matrix_4))
-    
-    T_Part_1 = np.linalg.inv(np.array([[T11, np.matmul(T11,X[:,i+1])], 
-                                        [T21, np.matmul(-T21,X[:,i+1])]]))
-    T_Part_2 = np.array([[np.matmul(T12,X[:,i]),T12],[np.matmul(T12,X[:,i]),T12]])
-    T_full   = np.multiply(T_Part_1,T_Part_2)
-    
-    #*T_Matrix_3*T_Matrix_4
+            Tsubi1[i,j] = Wi1[i,j]
+            Tsubi1[i,j+2*N+1] = Wi1[i,j]
+            Tsubi1[i+2*N+1,j] = Wi1[i,j]*Qi1[i]
+            Tsubi1[i+2*N+1,j+2*N+1] = -Wi1[i,j]*Qi1[i]
             
-#Build S-Matrix from given  total T matrix
+    return np.matmul(np.linalg.inv(Tsubi1),Tsubi)
+
+def TtoS(T,Qi,Qi1):
+    T11 = T[0:2*N+1,0:2*N+1]
+    T12 = T[2*N+1:4*N+2,0:2*N+1]
+    T21 = T[0:2*N+1,2*N+1:4*N+2]
+    T22 = T[2*N+1:4*N+2,2*N+1:4*N+2]
+    
+    Xi = np.diag(np.exp(-k_0*Qi*Hs))
+    Xi1 = np.diag(np.exp(-k_0*Qi1*Hs))
+    
+    S11 = np.matmul(T11,Xi) - reduce(np.matmul,[T12,np.linalg.inv(T22),T21,Xi])
+    S12 = reduce(np.matmul,[T12,np.linalg.inv(T22),Xi1])
+    S21 = -reduce(np.matmul,[np.linalg.inv(T22),T21,Xi])
+    S22 = np.matmul(np.linalg.inv(T22),Xi1)
+    return S11, S12, S21, S22
+
+def Redheffer(S11i, S12i, S21i, S22i, S11i1, S12i1, S21i1, S22i1):
+    S11 = np.matmul(S11i1,inv(np.identity(2*N+1))-np.matmul(S12i,S))
+    
+    
+T1 = np.identity(4*N+2,dtype = np.cdouble);
+Qi, Wi = np.linalg.eig(A[:,:,i]) # Computes eigen value and vector for every layer matrix A
+
+
+for i in range(Nl-1):
+    Qi1, Wi1 = np.linalg.eig(A[:,:,i+1]) # Computes eigen value and vector for every layer matrix A
+    T = Tmatrix(W[:,:,i],Q[:,i],W[:,:,i+1],Q[:,i+1])
+    S11, S12, S21, S22 = TtoS(T,Qi,Qi1)
+
+    Qi=Qi1
+    Wi=Wi1
+    
+    
+    
+         
+         
+         
 
