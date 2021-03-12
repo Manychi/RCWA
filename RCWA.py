@@ -122,13 +122,23 @@ def TtoS(T,Qi,Qi1):
     S22 = np.matmul(np.linalg.inv(T22),Xi1)
     return S11, S12, S21, S22
 
+<<<<<<< HEAD
 # def Redheffer(S11i, S12i, S21i, S22i, S11i1, S12i1, S21i1, S22i1):
 #     S11 = np.matmul(S11i1,inv(np.identity(2*N+1))-np.matmul(S12i,S))
     
+=======
+def Redheffer(S11i23, S12i12, S21i23, S11i12, S12i23, S22i23, S21i12, S22i12):
+    S11i13 = reduce(np.matmul, [S11i23, np.linalg.inv(np.identity(2*N+1)-np.matmul(S12i12, S21i23)) ,S11i12]) 
+    S12i13 = np.add(S12i23, reduce(np.matmul,[S11i23, S12i12, np.linalg.inv(np.identity(2*N+1)-np.matmul(S21i23, S12i12)) ,S22i23])) 
+    S21i13 = np.add(S21i12, reduce(np.matmul,[S22i12, S21i23, np.linalg.inv(np.identity(2*N+1)-np.matmul(S12i12, S21i23)) ,S11i12])) 
+    S22i13 = reduce(np.matmul, [S22i12, np.linalg.inv(np.identity(2*N+1)-np.matmul(S21i23, S12i12)) ,S22i23])  
+    return S11i13, S12i13, S21i13, S22i13
+>>>>>>> 718fb3f9dec747ed3837d200c773526256955c24
     
 T1 = np.identity(4*N+2,dtype = np.cdouble);
 Qi, Wi = np.linalg.eig(A[:,:,i]) # Computes eigen value and vector for every layer matrix A
 
+<<<<<<< HEAD
 
 def EVisual(r,t,c_plus,c_min,Nlt):
     kz_n = np.sqrt(k_0^2*e0 - Kx^2)
@@ -147,6 +157,8 @@ def EVisual(r,t,c_plus,c_min,Nlt):
     return E_vis
 
 
+=======
+>>>>>>> 718fb3f9dec747ed3837d200c773526256955c24
 for i in range(Nl-1):
     Qi1, Wi1 = np.linalg.eig(A[:,:,i+1]) # Computes eigen value and vector for every layer matrix A
     T = Tmatrix(W[:,:,i],Q[:,i],W[:,:,i+1],Q[:,i+1])
@@ -155,9 +167,9 @@ for i in range(Nl-1):
     Qi=Qi1
     Wi=Wi1
     
-    
-    
-         
+#testred
+for i in range(2*Nl+1):
+    Redheff1, Redheff2, Redheff3, Redheff4 = Redheffer(Wi1, Wi1, Wi1, Wi1, Wi, Wi, Wi, Wi)
          
          
 
