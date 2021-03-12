@@ -122,12 +122,29 @@ def TtoS(T,Qi,Qi1):
     S22 = np.matmul(np.linalg.inv(T22),Xi1)
     return S11, S12, S21, S22
 
-def Redheffer(S11i, S12i, S21i, S22i, S11i1, S12i1, S21i1, S22i1):
-    S11 = np.matmul(S11i1,inv(np.identity(2*N+1))-np.matmul(S12i,S))
+# def Redheffer(S11i, S12i, S21i, S22i, S11i1, S12i1, S21i1, S22i1):
+#     S11 = np.matmul(S11i1,inv(np.identity(2*N+1))-np.matmul(S12i,S))
     
     
 T1 = np.identity(4*N+2,dtype = np.cdouble);
 Qi, Wi = np.linalg.eig(A[:,:,i]) # Computes eigen value and vector for every layer matrix A
+
+
+def EVisual(r,t,c_plus,c_min,Nlt):
+    kz_n = np.sqrt(k_0^2*e0 - Kx^2)
+    z = np.arange(start = 0, stop = H, step = H/Nl)
+    E_vis = np.zeros((2*N+1,2*N+1,Nlt), dtype=np.cdouble)   
+    for i in range(Nlt):
+        if i == 0:
+            E_vis[:,:,i] = (t*np.exp(-1j*kz_n*z) + r*np.exp(1j*kz_n*z))
+                            
+        if i == Nlt:
+            E_vis[:,:,i] = (t*np.exp(-1j*kz_n*(z[i]))*np.exp(-1j*Kx*x))  
+            
+        else:
+            E_vis[:,:,i] = W[i,i]*(np.exp(-k_0*Q[i]*z[i-1])*c_plus + np.exp(k_0*Q[i]*z[i])*c_min)*np.exp(-1j*Kx*x)
+        
+    return E_vis
 
 
 for i in range(Nl-1):
