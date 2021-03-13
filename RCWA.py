@@ -8,11 +8,11 @@ import scipy as sp
 PI = 3.14159265359
 
 # Inputs
-theta_inc = 0; lambda_0 = 20;   # Angle of incidence and wavelength of incident light
-p = 50;                          # Grating period
+theta_inc = 5; lambda_0 = 20;   # Angle of incidence and wavelength of incident light
+p = 0.6;                          # Grating period
 alpha_l = 30; alpha_r = 50;     # Blazing and anti-blazing angle in degrees
 d = 0.5;                        # Width of top cut
-e0 = 1; e1 = 2;                 # Dielectric permitivity of surrounding medium and grating
+e0 = 1.2; e1 = 2;  e2 =1.1;     # Dielectric permitivity of surrounding medium and grating
 N = 1;                         # Number of harmonics
 Nl = 10;                        # Number of layers excluding sub- and superstrate layers
 Nlt = Nl+2;                     # Total number of layers including sub- and superstrate layers
@@ -136,20 +136,27 @@ Qi, Wi = np.linalg.eig(A[:,:,i]) # Computes eigen value and vector for every lay
 
 
 
-def EVisual(r,t,c_plus,c_min,Nlt):
-    kz_n = np.sqrt(k_0^2*e0 - Kx^2)
-    z = np.arange(start = 0, stop = H, step = H/Nl)
-    E_vis = np.zeros((2*N+1,2*N+1,Nlt), dtype=np.cdouble)   
+def EVisual(r,t,c_plus,Nlt,mode):
+    kz_n_1   = np.sqrt(k_0*k_0*e0 - Kx[mode]*Kx[mode])
+    kz_n_sub = np.sqrt(k_0*k_0*e0*e1 -Kx[mode]*Kx[mode])
+    kz_n_sup = np.sqrt(k_0*k_0*e0*e2 -Kx[mode]*Kx[mode])
+    z      = np.arange(start = 0, stop = H, step = H/Nl)
+    dist   = np.arange(start = 0,stop = 3*p, step = p/10)
+    E_vis  = np.zeros((Nlt,dist.size), dtype=np.cdouble)   
     for i in range(Nlt):
-        if i == 0:
-            E_vis[:,:,i] = (t*np.exp(-1j*kz_n*z) + r*np.exp(1j*kz_n*z))
-                            
-        if i == Nlt:
-            E_vis[:,:,i] = (t*np.exp(-1j*kz_n*(z[i]))*np.exp(-1j*Kx*x))  
+        i = i-1
+        for j in range(dist.size):
             
-        else:
-            E_vis[:,:,i] = W[i,i]*(np.exp(-k_0*Q[i]*z[i-1])*c_plus + np.exp(k_0*Q[i]*z[i])*c_min)*np.exp(-1j*Kx*x)
-        
+            if i == 0:
+                E_vis[i,j] = (t*np.exp(-1j*kz_n_1*z[i]) + r*np.exp(1j*kz_n_1*z[i]))*np.exp(-1j*Kx[mode]*dist[j])
+                            
+            if i == Nlt:
+                E_vis[i,j] = t*np.exp(-1j*kz_n_sub*z[i])*np.exp(-1j*Kx[mode]*dist[j]) 
+            
+            else:
+                E_vis[i,j] = W[mode,mode,i-1]*(np.exp(-k_0*Q[mode,i-1]*z[i-1])*c_plus)*np.exp(-1j*Kx[mode]*dist[j]*1)
+            
+        i = i+1
     return E_vis
 
 for i in range(Nl-1):
@@ -163,6 +170,15 @@ for i in range(Nl-1):
 #testred
 for i in range(2*Nl+1):
     Redheff1, Redheff2, Redheff3, Redheff4 = Redheffer(Wi1, Wi1, Wi1, Wi1, Wi, Wi, Wi, Wi)
-         
-         
+    
+r = -.5
+t = 0.5
+c = 0.25
+Efield = EVisual(r,t,c,Nlt,1)         
 
+def heatmap2d(arr: np.ndarray):
+    plt.imshow(arr, cmap='viridis')
+    plt.colorbar()
+    plt.show()
+    
+heatmap2d(np.abs(Efield))
