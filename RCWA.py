@@ -1,4 +1,4 @@
-# testing GIT2
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
@@ -8,12 +8,13 @@ import scipy as sp
 PI = 3.14159265359
 
 # Inputs
-theta_inc = 5; lambda_0 = 20;   # Angle of incidence and wavelength of incident light
-p = 0.6;                          # Grating period
+theta_inc = 0; lambda_0 = 2;   # Angle of incidence and wavelength of incident light
+p = 1;                          # Grating period
 alpha_l = 30; alpha_r = 50;     # Blazing and anti-blazing angle in degrees
 d = 0.5;                        # Width of top cut
 e0 = 1.2; e1 = 2;  e2 =1.1;     # Dielectric permitivity of surrounding medium and grating
-N = 1;                         # Number of harmonics
+
+N = 10;                         # Number of harmonics
 Nl = 10;                        # Number of layers excluding sub- and superstrate layers
 Nlt = Nl+2;                     # Total number of layers including sub- and superstrate layers
 
@@ -47,27 +48,32 @@ Kx = kinc_x-2*PI*n/p                #
 Kx2 = Kx*Kx/(k_0*k_0)               # Find the Kx squared matrix diagonal
 
 # Function to solve the integral for all harmonics and put it in an array
-def integral(boundaryl,boundaryr):                          # Inputs are the left and right boundary
-    result = np.zeros((4*N+1,1), dtype=np.cdouble);         # Memory allocation
-    for n in range(-2*N,2*N+1):                             # Do the calculation for all harmonics present in the E-matrix
-        if n != 0:                                          # n equal to zero gives devision by 0 so must be taken separately
+
+def integral(boundaryl,boundaryr):                            # Inputs are the left and right boundary
+    result = np.zeros((4*N+1,1), dtype=np.cdouble);           # Memory allocation
+    for n in range(-2*N,2*N+1):                               # Do the calculation for all harmonics present in the E-matrix
+        if n != 0:                                            # n equal to zero gives devision by 0 so must be taken separately
             result[n+2*N] = np.exp(-2j*PI*n*boundaryl/p)*p*1j/(2*PI*n)
-            - np.exp(-2j*PI*n*boundaryr/p)*p*1j/(2*PI*n)    # Calculating the integral
+
+            - np.exp(-2j*PI*n*boundaryr/p)*p*1j/(2*PI*n)      # Calculating the integral
         else:
-            result[n+2*N] = boundaryl -boundaryr            # In case n is equal to zero integral is over a constant
-    return result                                           # Return the resulting array
+
+            result[n+2*N] = boundaryl -boundaryr              # In case n is equal to zero integral is over a constant
+    return result                                             # Return the resulting array
 
 # Function to get the Kx2 and Earrays in a matrix form
 def ArraysToA(Earray,Kx2):
-    A = np.zeros((2*N+1,2*N+1), dtype=np.cdouble)
-    for i in range(0, 4*N+1):
+
+    A = np.zeros((2*N+1,2*N+1), dtype=np.cdouble)             # Memory allocation
+    for i in range(0, 4*N+1):                                 # For all harmonics 
         if i < 2*N:
             np.fill_diagonal(A[2*N-i:], -Earray[i]);
         elif i == 2*N:
             np.fill_diagonal(A, Kx2-Earray[i]);
         else:
             np.fill_diagonal(A[:,i-2*N:], -Earray[i]);
-    return A  # Return the A matrix for that layer as defined in the slides
+
+    return A                                                  # Return the A matrix for that layer as defined in the slides
 
 # Find the Ai matrix for all layers i
 A = np.zeros((2*N+1,2*N+1,Nlt), dtype=np.cdouble)             # Memory allocation
@@ -78,63 +84,73 @@ for i in range(Nl):                                           # For every layer 
     Earray = e0*integral(-p/2,Sl[i])+e1*integral(Sl[i],Sr[i])+e0*integral(Sr[i],p/2) # Calculate the complete integral for the three regions
     A[:,:,i+1] = ArraysToA(Earray,Kx2)                        # Convert to a matrix form where last index is the layer number
 
-# Find eigen vector,W, and values,Q, for each layer
-Q = np.zeros((2*N+1,Nl),      dtype = np.cdouble)     #Memory allocation for Q
-W = np.zeros((2*N+1,2*N+1,Nl),dtype = np.cdouble)     #Memory allocation for W
-X = Q               # Memory allocation for X    
-                                  
-for i in range(Nl): # For every layer 
-    Q[:,i], W[:,:,i] = np.linalg.eig(A[:,:,i]) # Computes eigen value and vector for every layer matrix A
- 
-#Build X-matrix
-X = np.exp(-k_0*Q*Hs)
 
-Tsubi = np.zeros((4*N+2, 4*N+2), dtype=np.cdouble)
-Tsubi1 = np.zeros((4*N+2, 4*N+2), dtype=np.cdouble)
-
+# Function to find the Tmatrix of interface of layer i and i+1 based on the eigenvalues Q and eigenvectors W
 def Tmatrix(Wi,Qi,Wi1,Qi1):
-    for i in range(2*N+1):
-        for j in range(2*N+1):
-            Tsubi[i,j] = Wi[i,j]
-            Tsubi[i,j+2*N+1] = Wi[i,j]
-            Tsubi[i+2*N+1,j] = Wi[i,j]*Qi[i]
-            Tsubi[i+2*N+1,j+2*N+1] = -Wi[i,j]*Qi[i]
-    
-            Tsubi1[i,j] = Wi1[i,j]
-            Tsubi1[i,j+2*N+1] = Wi1[i,j]
-            Tsubi1[i+2*N+1,j] = Wi1[i,j]*Qi1[i]
-            Tsubi1[i+2*N+1,j+2*N+1] = -Wi1[i,j]*Qi1[i]
-            
-    return np.matmul(np.linalg.inv(Tsubi1),Tsubi)
 
+    Tsubi = np.zeros((4*N+2, 4*N+2), dtype=np.cdouble)        # Memory allocation
+    Tsubi1 = np.zeros((4*N+2, 4*N+2), dtype=np.cdouble)       # Memory allocation
+    
+    for i in range(2*N+1):                                    # For all harmonics horizontal
+        for j in range(2*N+1):                                # For all harmonics vertical
+            Tsubi[i,j] = Wi[i,j]                              # Fill in part of T11 for layer i
+            Tsubi[i,j+2*N+1] = Wi[i,j]                        # Fill in part of T12 for layer i
+            Tsubi[i+2*N+1,j] = Wi[i,j]*Qi[i]                  # Fill in part of T21 for layer i
+            Tsubi[i+2*N+1,j+2*N+1] = -Wi[i,j]*Qi[i]           # Fill in part of T22 for layer i
+    
+            Tsubi1[i,j] = Wi1[i,j]                            # Fill in part of T11 for layer i+1
+            Tsubi1[i,j+2*N+1] = Wi1[i,j]                      # Fill in part of T11 for layer i+1
+            Tsubi1[i+2*N+1,j] = Wi1[i,j]*Qi1[i]               # Fill in part of T11 for layer i+1
+            Tsubi1[i+2*N+1,j+2*N+1] = -Wi1[i,j]*Qi1[i]        # Fill in part of T11 for layer i+1
+            
+
+    return np.matmul(np.linalg.inv(Tsubi1),Tsubi)             # Return the Tmatrix of Ti,i+1
+
+# Function to convert Ti,i+1 to Si,i+1 based on the T matrix and the eigenvalues
 def TtoS(T,Qi,Qi1):
+    # Split the T matrix into the four subquadrants
     T11 = T[0:2*N+1,0:2*N+1]
     T12 = T[2*N+1:4*N+2,0:2*N+1]
     T21 = T[0:2*N+1,2*N+1:4*N+2]
     T22 = T[2*N+1:4*N+2,2*N+1:4*N+2]
     
+    # Compute the X vectors of layer i and i+1
     Xi = np.diag(np.exp(-k_0*Qi*Hs))
     Xi1 = np.diag(np.exp(-k_0*Qi1*Hs))
     
+    # Define the four quadrants of the S-matrix
     S11 = np.matmul(T11,Xi) - reduce(np.matmul,[T12,np.linalg.inv(T22),T21,Xi])
     S12 = reduce(np.matmul,[T12,np.linalg.inv(T22),Xi1])
     S21 = -reduce(np.matmul,[np.linalg.inv(T22),T21,Xi])
     S22 = np.matmul(np.linalg.inv(T22),Xi1)
-    return S11, S12, S21, S22
+    return S11, S12, S21, S22                               # Return all the quadrants of the computed S-matrix
 
 
-def Redheffer(S11i23, S12i12, S21i23, S11i12, S12i23, S22i23, S21i12, S22i12):
+# Function to calculate the Redheffer star product from all quadrants of S1,i and Si,i+1
+def Redheffer(S11i12, S12i12, S21i12, S22i12, S11i23, S12i23, S21i23, S22i23):
     S11i13 = reduce(np.matmul, [S11i23, np.linalg.inv(np.identity(2*N+1)-np.matmul(S12i12, S21i23)) ,S11i12]) 
     S12i13 = np.add(S12i23, reduce(np.matmul,[S11i23, S12i12, np.linalg.inv(np.identity(2*N+1)-np.matmul(S21i23, S12i12)) ,S22i23])) 
     S21i13 = np.add(S21i12, reduce(np.matmul,[S22i12, S21i23, np.linalg.inv(np.identity(2*N+1)-np.matmul(S12i12, S21i23)) ,S11i12])) 
     S22i13 = reduce(np.matmul, [S22i12, np.linalg.inv(np.identity(2*N+1)-np.matmul(S21i23, S12i12)) ,S22i23])  
-    return S11i13, S12i13, S21i13, S22i13
+
+    return S11i13, S12i13, S21i13, S22i13                   # Return all the quadrants of the computed global S-matrix
 
     
-T1 = np.identity(4*N+2,dtype = np.cdouble);
-Qi, Wi = np.linalg.eig(A[:,:,i]) # Computes eigen value and vector for every layer matrix A
 
 
+Qi, Wi = np.linalg.eig(A[:,:,0])                            # Compute the eigenvalues Q and eigenvectors W of superstrate
+Qi1, Wi1 = np.linalg.eig(A[:,:,1])                          # Compute the eigenvalues Q and eigenvectors W of first layer
+T = Tmatrix(Wi,Qi,Wi1,Qi1)                                  # Use these values to compute the T0,1 matrix
+S11global, S12global, S21global, S22global = TtoS(T,Qi,Qi1) # Convert the T0,1 matrix to S0,1 and call it the global S matrix
+
+for i in range(Nl):                                         # For all layers
+    Qi, Wi = Qi1, Wi1                                       # Update Qi and Wi
+    Qi1, Wi1 = np.linalg.eig(A[:,:,i+2])                    # Computes eigen value and vector for layer i+1
+    T = Tmatrix(Wi,Qi,Wi1,Qi1)                              # Convert to Ti,i+1 matrix
+    S11, S12, S21, S22 = TtoS(T,Qi,Qi1)                     # Compute Si,i+1
+    S11global, S12global, S21global, S22global = Redheffer(S11global, S12global, S21global, S22global, S11, S12, S21, S22) # Use Redheffer to compute S1,i+1
+
+         
 
 def EVisual(r,t,c_plus,Nlt,mode):
     kz_n_1   = np.sqrt(k_0*k_0*e0 - Kx[mode]*Kx[mode])
@@ -144,33 +160,24 @@ def EVisual(r,t,c_plus,Nlt,mode):
     dist   = np.arange(start = 0,stop = 3*p, step = p/10)
     E_vis  = np.zeros((Nlt,dist.size), dtype=np.cdouble)   
     for i in range(Nlt):
+
         i = i-1
         for j in range(dist.size):
             
             if i == 0:
                 E_vis[i,j] = (t*np.exp(-1j*kz_n_1*z[i]) + r*np.exp(1j*kz_n_1*z[i]))*np.exp(-1j*Kx[mode]*dist[j])
                             
+
             if i == Nlt:
                 E_vis[i,j] = t*np.exp(-1j*kz_n_sub*z[i])*np.exp(-1j*Kx[mode]*dist[j]) 
             
+
             else:
                 E_vis[i,j] = W[mode,mode,i-1]*(np.exp(-k_0*Q[mode,i-1]*z[i-1])*c_plus)*np.exp(-1j*Kx[mode]*dist[j]*1)
             
         i = i+1
     return E_vis
-
-for i in range(Nl-1):
-    Qi1, Wi1 = np.linalg.eig(A[:,:,i+1]) # Computes eigen value and vector for every layer matrix A
-    T = Tmatrix(W[:,:,i],Q[:,i],W[:,:,i+1],Q[:,i+1])
-    S11, S12, S21, S22 = TtoS(T,Qi,Qi1)
-
-    Qi=Qi1
-    Wi=Wi1
-    
-#testred
-for i in range(2*Nl+1):
-    Redheff1, Redheff2, Redheff3, Redheff4 = Redheffer(Wi1, Wi1, Wi1, Wi1, Wi, Wi, Wi, Wi)
-    
+         
 r = -.5
 t = 0.5
 c = 0.25
