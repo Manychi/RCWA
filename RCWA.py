@@ -144,55 +144,58 @@ for i in range(1,Nlt-1):                                    # For all layers
     Sglobal = Redheffer(Sglobal,S)                          # Use Redheffer to compute S1,i+1
 
 c1_plus = np.ones((2*N+1))
+c_min = np.ones((2*N+1))-0.5
 r = np.matmul(Sglobal[2],c1_plus)
 t = np.matmul(Sglobal[0],c1_plus)
 
-
-
-
-
-
-
-
-
-
-
-
-def EVisual(r,t,x,z):
-    kz_n_1   = np.sqrt(k_0*k_0*e0 - Kx*Kx)
-    np.sqrt([k_0*k_0*e0-Kx*Kx,1j])
-    # kz_n_sub = np.sqrt(k_0*k_0*e0*e1 -Kx*Kx)
-    # kz_n_sup = np.sqrt(k_0*k_0*e0*e2 -Kx*Kx)
-    # z   = np.arange(start = -H, stop = 2*H, step = H/(10*Nl))
-    # x   = np.arange(start = -p/2,stop = p/2, step = p/100)
-    E_vis  = np.zeros((2*N+1), dtype=np.cdouble) 
-    
-    for i in range(2*N+1):
-        if i == N:
-            z = 1
-            x = 1
-            E_vis = (np.exp(-1j*kz_n_1*z) + r*np.exp(1j*kz_n_1,z))*np.exp(-1j*Kx*x)
-        # else:
-        #     E_vis = r*np.exp(1j*kz_n_1*z)*np.exp(-1j*Kx*x)
-    
-    # for i in range(Nlt):
-    #     for j in range(dist.size):
+#Function to find layer and heights of z-boundaries
+def FindLayer(Height):
+    for i in range(Nlt):            #Range for each layer
+        if Height<= H/Nl*i:         #Check whether given height is below boundary
+            z_begin = H/Nl*(i-1)    #Calcs the lower boundary z
+            z_next  = H/Nl*i        #Calcs the upper boundary z
+            return i,z_begin,z_next
+        
+        
+#Function to calculate the E-field given a certain position in z and x with each mode
+def EVisual(r,t,c_plus,c_min):
+    z   = np.arange(start = -H, stop = 2*H, step = H/(10*Nl))   #Defines the z axis
+    x   = np.arange(start = -p/2,stop = p/2, step = p/30)       #Defines the x axis
+    E_vis  = np.zeros((x.size,z.size), dtype=np.cdouble)        #Memory allocation for E_vis
+    for l in range(x.size):             #Makes the range for all x
+        
+        for j in range(z.size):         #Makes the range for all z
+            if z[j] <= 0:               #Checks whether we are in superstrate
             
-    #         if i == 0:
-    #             E_vis[i,j] = (t*np.exp(-1j*kz_n_1*z[i]) + r*np.exp(1j*kz_n_1*z[i]))*np.exp(-1j*Kx*dist[j])
-                            
-
-    #         if i == Nlt:
-    #             E_vis[i,j] = t*np.exp(-1j*kz_n_sub*z[i])*np.exp(-1j*Kx*dist[j]) 
+                for i in range(2*N+1):  #Makes loop for all modes
+                    kz_n_sup= np.sqrt([(k_0*k_0*e0 - Kx[i]*Kx[i]),(1-1j)]) #Calculates the k_{z,n} for each mode
             
-
-    #         else:
-    #             E_vis[i,j] = W[mode,mode,i-1]*(np.exp(-k_0*Q[mode,i-1]*z[i-1])*c_plus)*np.exp(-1j*Kx*dist[j]*1)
-            
+                    if i == N:                                             #Calculates E field of mode 0
+                        E_vis[l,j] = (np.exp(-1j*kz_n_sup[0]*z[j]) + r[i]*np.exp(1j*kz_n_sup[0]*z[j]))*np.exp(-1j*Kx[i]*x[l])
+                    else:                                                  #Calculates E field other modes
+                        E_vis[l,j] = r[i]*np.exp(1j*kz_n_sup[0]*z[j])*np.exp(-1j*Kx[i]*x[l])
+                    E_vis[l,j] += E_vis[l,j]                               #Addition to get E_vis for each mode on a position
+                    
+            if z[j]>=H:                 #Checks whether we are in substrate
+                for i in range(2*N+1):  #Makes loop for all modes
+                    kz_n_sub= np.sqrt([(k_0*k_0*e0*e2 - Kx[i]*Kx[i]),(1-1j)])               #Calculates the k_{z,n} for each mode
+                    E_vis[l,j] = t[i]*np.exp(-1j*kz_n_sub[0]*z[j])*np.exp(-1j*Kx[i]*x[l])   #Calculates E field each mode
+                    E_vis[l,j] += E_vis[l,j]            #Addition to get E_vis for each mode on a position
+                    
+            else:                           #Now we are in the grating as we are not in sub or sup
+                for i in range(2*N+1):      #Makes loop for all modes in 1 direction
+                    for k in range(2*N+1):  #Makes loop for all modes in other direction
+                        
+                        # kz_n_grat = np.sqrt([(k_0*k_0*e0*e1 - Kx[i]*Kx[i]),(1-1j)])
+                        layer,z0,z1 = FindLayer(z[j])   #Finds the layer, and heights of boundaries 
+                        E_vis[l,j] = (W[i,k,layer]*np.exp(-1*k_0*Q[k,layer]*(z[j]-z0))*c_plus[layer] 
+                        + c_min[layer]*np.exp(-k_0*Q[k,layer]*(z[j]-z1)))*np.exp(-1j*Kx[i]*x[layer]) #Calculates E field each mode
+                        
+                        E_vis[l,j] += E_vis[l,j]        #Addition to get E_vis for each mode on a position
     return E_vis
 
 
-Efield = EVisual(r,t,1,1)         
+Efield = EVisual(r,t,c1_plus,c_min)         
 
 def heatmap2d(arr: np.ndarray):
     plt.imshow(arr, cmap='viridis')
