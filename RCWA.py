@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.image as mpimg
 import numpy as np
 from functools import reduce # only in Python 3
 
@@ -8,20 +9,23 @@ PI = 3.14159265359
 # Inputs
 theta_inc = 30; lambda_0 = 2;   # Angle of incidence and wavelength of incident light
 p = 1;                          # Grating period
-alpha_l = 90; alpha_r = 30;     # Blazing and anti-blazing angle in degrees
+alpha_l = 30; alpha_r = 30;     # Blazing and anti-blazing angle in degrees
 d = 0.5;                        # Width of top cut
 e0 = 1.2; e1 = 2;  e2 =1.1;     # Dielectric permitivity of surrounding medium and grating
 
 N = 1;                         # Number of harmonics
-Nl = 1;                        # Number of layers excluding sub- and superstrate layers
+Nl = 2;                        # Number of layers excluding sub- and superstrate layers
 Nlt = Nl+2;                     # Total number of layers including sub- and superstrate layers
-
+accuracy = 100                  # Accuracy to determine the figure steps
 # Geometry definition
 alpha_lrad = alpha_l*PI/180; alpha_rrad = alpha_r*PI/180;   # Convert angles to radians
 H  = (p-d)/(1/np.tan(alpha_lrad)+1/np.tan(alpha_rrad))      # Height of grating
 Hs = H/Nl                                                   # Height of a slice
 Sl = -p/2 + Hs/(2*np.tan(alpha_lrad))*(1+2*np.arange(0,Nl)) # Slice left boundary
 Sr =  p/2 - Hs/(2*np.tan(alpha_rrad))*(1+2*np.arange(0,Nl)) # Slice right boundary
+
+z_start = -H/2      # Measure from which the plot starts
+z_stop  = 1.5*H     # Measure at which height the plot ends
 
 # Draw Geometry
 figure, ax = plt.subplots(1)    # Make a plot
@@ -142,9 +146,11 @@ for i in range(1,Nlt-1):                                    # For all layers
     T = Tmatrix(W[:,:,i],Q[:,i],W[:,:,i+1],Q[:,i+1])        # Convert to Tbari,i+1 matrix
     S = TtoS(T,Q[:,i],Q[:,i+1])                             # Compute Si,i+1
     Sglobal = Redheffer(Sglobal,S)                          # Use Redheffer to compute S1,i+1
+    Sglobal_total = Sglobal[:,:,i] #When computing Sglobal he finds the harmonics
 
-c1_plus = np.ones((2*N+1))
-c_min = np.ones((2*N+1))-0.5
+c1_plus = np.zeros((2*N+1))
+c1_plus[N] = 1
+c_min = np.zeros((2*N+1))
 r = np.matmul(Sglobal[2],c1_plus)
 t = np.matmul(Sglobal[0],c1_plus)
 
@@ -159,9 +165,9 @@ def FindLayer(Height):
         
 #Function to calculate the E-field given a certain position in z and x with each mode
 def EVisual(r,t,c_plus,c_min):
-    z   = np.arange(start = -0.5*H, stop = 2*H, step = H/(100*Nl))   #Defines the z axis
-    x   = np.arange(start = -p/2,stop = p/2, step = p/100)       #Defines the x axis
-    E_vis  = np.zeros((z.size,x.size), dtype=np.cdouble)        #Memory allocation for E_vis
+    z   = np.arange(start = z_start, stop = z_stop, step = (z_stop-z_start)/(accuracy))   #Defines the z axis
+    x   = np.arange(start = -p/2,stop = p/2, step = p/accuracy)           #Defines the x axis
+    E_vis  = np.zeros((z.size,x.size), dtype=np.cdouble)             #Memory allocation for E_vis
     for l in range(x.size):             #Makes the range for all x
         
         for j in range(z.size):         #Makes the range for all z
@@ -175,31 +181,78 @@ def EVisual(r,t,c_plus,c_min):
                     else:                                                  #Calculates E field other modes
                         E_vis[j,l] = r[i]*np.exp(1j*kz_n_sup[0]*z[j])*np.exp(-1j*Kx[i]*x[l])
                     E_vis[j,l] += E_vis[j,l]                               #Addition to get E_vis for each mode on a position
-                    
-            if z[j]>=H:                 #Checks whether we are in substrate
+            if z[j] >= 0 and z[j] <= H:             #check wheter we are in grating
+                 layer,z0,z1 = FindLayer(z[j])      #Finds the layer, and heights of boundaries
+                 for i in range(2*N+1):             #Makes loop for all modes in 1 direction
+                    for k in range(2*N+1):          #Makes loop for all modes in other direction
+                        
+                        # kz_n_grat = np.sqrt([(k_0*k_0*e0*e1 - Kx[i]*Kx[i]),(1-1j)])  
+                        E_vis[j,l] = (W[i,k,layer]*np.exp(-1*k_0*Q[k,layer]*(z[j]-z0))*c_plus[layer] 
+                        + c_min[layer]*np.exp(-k_0*Q[k,layer]*(z[j]-z1)))*np.exp(-1j*Kx[i]*x[l]) #Calculates E field each mode
+                        
+                        E_vis[j,l] += E_vis[j,l]        #Addition to get E_vis for each mode on a position 
+                        
+            else:                       #Substrate is the only position left
                 for i in range(2*N+1):  #Makes loop for all modes
-                    kz_n_sub= np.sqrt([(k_0*k_0*e0*e2 - Kx[i]*Kx[i]),(1-1j)])               #Calculates the k_{z,n} for each mode
-                    E_vis[j,l] = t[i]*np.exp(-1j*kz_n_sub[0]*z[j])*np.exp(-1j*Kx[i]*x[l])   #Calculates E field each mode
+                    kz_n_sub= np.sqrt([(k_0*k_0*e0*e2 - Kx[i]*Kx[i]),(1-1j)])                   #Calculates the k_{z,n} for each mode
+                    E_vis[j,l] = t[i]*np.exp(-1j*kz_n_sub[0]*(z[j]-H))*np.exp(-1j*Kx[i]*x[l])   #Calculates E field each mode
                     E_vis[j,l] += E_vis[j,l]            #Addition to get E_vis for each mode on a position
                     
-            else:                           #Now we are in the grating as we are not in sub or sup
-                for i in range(2*N+1):      #Makes loop for all modes in 1 direction
-                    for k in range(2*N+1):  #Makes loop for all modes in other direction
-                        
-                        # kz_n_grat = np.sqrt([(k_0*k_0*e0*e1 - Kx[i]*Kx[i]),(1-1j)])
-                        layer,z0,z1 = FindLayer(z[j])   #Finds the layer, and heights of boundaries 
-                        E_vis[j,l] = (W[i,k,layer]*np.exp(-1*k_0*Q[k,layer]*-(z[j]-z0))*c_plus[layer] 
-                        + c_min[layer]*np.exp(-k_0*Q[k,layer]*(z[j]-z1)))*np.exp(-1j*Kx[i]*x[layer]) #Calculates E field each mode
-                        
-                        E_vis[j,l] += E_vis[j,l]        #Addition to get E_vis for each mode on a position
+                
     return E_vis
 
-
 Efield = EVisual(r,t,c1_plus,c_min)         
-
+z   = np.arange(start = z_start, stop = z_stop, step = (z_stop-z_start)/(accuracy))   #Defines the z axis
+x   = np.arange(start = -p/2,stop = p/2, step = p/100)           #Defines the x axis
+    
 def heatmap2d(arr: np.ndarray):
-    plt.imshow(arr, cmap='viridis')
+    plt.imshow(arr, cmap='inferno')
     plt.colorbar()
     plt.show()
     
-heatmap2d(np.abs(Efield))
+def GetTickValues(array,nrlabels):
+    j = 0
+    Ticks = np.zeros(nrlabels+1,dtype = float)
+    step = round(array.size/nrlabels)
+    for i in range(nrlabels+1):
+            if i == nrlabels:
+                Ticks[j] = array[array.size-1]
+                return Ticks
+            Ticks[j] = array[step*i]
+            j +=1
+    
+def heatmapEfield(Efield):
+    figure, ax = plt.subplots(1)
+    
+    for i in range(Nl):             # Draw the rectangular slices
+        rect = patches.Rectangle((Sl[Nl-1-i]*x.size+x.size/2, (i)*z.size/(Nlt)+(z_stop-z_start)/(2*H*Nlt)*z.size), 
+                                 (-Sl[Nl-1-i] + Sr[Nl-1-i])*x.size, (z.size)/Nlt ,
+                                 edgecolor='b',facecolor="none")
+        print((i)*z.size/Nlt ,np.around(((z.size)/Nlt)/Nl,2))
+        ax.add_patch(rect)
+    # plt.plot( c='g',zorder=10)
+    hm = ax.matshow(Efield,cmap ='inferno')
+    ax.imshow(Efield, extent=[-p/2,p/2,H,0])
+    nx = x.shape[0]
+    no_xlabels = 5 # how many labels visible on the x axis
+    step_x = int(nx/(no_xlabels-1)) # step between consecutive labels
+    x_positions = np.arange(0,nx,step_x-1/no_xlabels) # pixel count at label position
+    x_labels = np.around(x[::step_x],2) # labels you want to see
+    x_labels = np.append(x_labels,p/2)
+    ny = z.shape[0]
+    no_ylabels = 5 # how many labels visible on the y axis
+    step_y = int(ny/(no_ylabels-1)) 
+    y_positions = np.arange(0,ny,step_y-1/no_ylabels)
+    y_labels =z[::step_y] # labels you want to see
+    y_labels =  np.around(np.append(y_labels,z_stop),4)*1000
+    
+    plt.xticks(x_positions, x_labels)
+    plt.yticks(y_positions, y_labels)
+    plt.xlabel('x  [nm]', fontweight ='bold') 
+    plt.ylabel('z, [nm]', fontweight ='bold')
+    ax.get_xaxis().tick_bottom()
+    figure.colorbar(hm)
+    plt.show()
+
+# heatmap2d(np.abs(Efield))
+heatmapEfield(np.abs(Efield))
