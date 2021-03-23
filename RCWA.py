@@ -13,8 +13,8 @@ alpha_l = 30; alpha_r = 30;     # Blazing and anti-blazing angle in degrees
 d = 0.5;                        # Width of top cut
 e0 = 1.2; e1 = 2;  e2 =1.1;     # Dielectric permitivity of surrounding medium and grating
 
-N = 1;                         # Number of harmonics
-Nl = 2;                        # Number of layers excluding sub- and superstrate layers
+N = 5;                         # Number of harmonics
+Nl = 5;                        # Number of layers excluding sub- and superstrate layers
 Nlt = Nl+2;                     # Total number of layers including sub- and superstrate layers
 accuracy = 100                  # Accuracy to determine the figure steps
 # Geometry definition
@@ -27,6 +27,8 @@ Sr =  p/2 - Hs/(2*np.tan(alpha_rrad))*(1+2*np.arange(0,Nl)) # Slice right bounda
 z_start = -H/2      # Measure from which the plot starts
 z_stop  = 1.5*H     # Measure at which height the plot ends
 
+
+#Format for complex values: numpy.complex128 or numpy.clongdouble
 # Draw Geometry
 figure, ax = plt.subplots(1)    # Make a plot
 
@@ -52,7 +54,7 @@ Kx2 = Kx*Kx/(k_0*k_0)               # Find the Kx squared matrix diagonal
 
 # Function to solve the integral for all harmonics and put it in an array
 def integral(boundaryl,boundaryr):                            # Inputs are the left and right boundary
-    result = np.zeros((4*N+1,1), dtype=np.cdouble);           # Memory allocation
+    result = np.zeros((4*N+1,1), dtype=np.complex64);           # Memory allocation
     for n in range(-2*N,2*N+1):                               # Do the calculation for all harmonics present in the E-matrix
         if n != 0:                                            # n equal to zero gives devision by 0 so must be taken separately
             result[n+2*N] = np.exp(-2j*PI*n*boundaryl/p)*p*1j/(2*PI*n)
@@ -63,7 +65,7 @@ def integral(boundaryl,boundaryr):                            # Inputs are the l
 
 # Function to get the Kx2 and Earrays in a matrix form
 def ArraysToA(Earray,Kx2):
-    A = np.zeros((2*N+1,2*N+1), dtype=np.cdouble)             # Memory allocation
+    A = np.zeros((2*N+1,2*N+1), dtype=np.complex64)             # Memory allocation
     for i in range(4*N+1):                                    # For all harmonics 
         if i < 2*N:
             np.fill_diagonal(A[2*N-i:], -Earray[i]);
@@ -74,7 +76,7 @@ def ArraysToA(Earray,Kx2):
     return A                                                  # Return the A matrix for that layer as defined in the slides
 
 # Find the Ai matrix for all layers i
-A = np.zeros((2*N+1,2*N+1,Nlt), dtype=np.cdouble)             # Memory allocation
+A = np.zeros((2*N+1,2*N+1,Nlt), dtype=np.complex64)             # Memory allocation
 A[:,:,0] = ArraysToA(e0*integral(-p/2,p/2),Kx2)               # Determine A in the superstrate
 A[:,:,Nlt-1] = ArraysToA(e2*integral(-p/2,p/2),Kx2)           # Determine A in the substrate
 
@@ -85,8 +87,8 @@ for i in range(Nl):                                           # For every layer 
 # Function to find the Tmatrix of interface of layer i and i+1 based on the eigenvalues Q and eigenvectors W
 def Tmatrix(Wi,Qi,Wi1,Qi1):
 
-    Tsubi = np.zeros((4*N+2, 4*N+2), dtype=np.cdouble)        # Memory allocation
-    Tsubi1 = np.zeros((4*N+2, 4*N+2), dtype=np.cdouble)       # Memory allocation
+    Tsubi = np.zeros((4*N+2, 4*N+2), dtype=np.complex64)        # Memory allocation
+    Tsubi1 = np.zeros((4*N+2, 4*N+2), dtype=np.complex64)       # Memory allocation
     
     for i in range(2*N+1):                                    # For all harmonics horizontal
         for j in range(2*N+1):                                # For all harmonics vertical
@@ -130,29 +132,97 @@ def Redheffer(Sglobal_old,S):  #Sglobal is the total S matrix, S is the next lay
     Sglobal_new22 = reduce(np.matmul, [Sglobal_old[3], np.linalg.inv(np.identity(2*N+1)-np.matmul(S[2], Sglobal_old[1])) ,S[3]])  
     return np.array([Sglobal_new11, Sglobal_new12, Sglobal_new21, Sglobal_new22])                  # Return all the quadrants of the computed global S-matrix
 
+
+def c_variables(Sglobal1, c1_plus, cm_minus):
+    c =np.array([np.add(np.matmul(Sglobal[0], c1_plus), np.matmul(Sglobal[1], cm_minus)), np.add(np.matmul(Sglobal[2], c1_plus), np.matmul(Sglobal[3], cm_minus))])
+    c1_plus = c[0]
+    cm_minus = c[1]
+    return c1_plus, cm_minus
+
+def TbartoT (Tglobal_old, Tbar, Qi, Qi1):
+    
+    Xi1_matrix = np.zeros((4*N+2, 4*N+2), dtype=np.complex64) 
+    Xi_matrix = np.zeros((4*N+2, 4*N+2), dtype=np.complex64) 
+    
+    Xi1_matrix[0:2*N+1,0:2*N+1] = np.identity(2*N+1)
+    Xi1_matrix[2*N+1:4*N+2,2*N+1:4*N+2] = np.diag(np.exp(-k_0*Qi1*Hs))
+    
+    Xi_matrix[0:2*N+1,0:2*N+1] = np.diag(np.exp(-k_0*Qi*Hs))
+    Xi_matrix[2*N+1:4*N+2,2*N+1:4*N+2] = np.identity(2*N+1)
+    
+    if np.linalg.norm(Tglobal_old) == 0:
+        Tglobal_new = reduce(np.matmul, [np.linalg.inv(Xi1_matrix), Tbar, Xi_matrix])
+        
+    else:
+        Tglobal_new = reduce(np.matmul, [Tglobal_old, np.linalg.inv(Xi1_matrix), Tbar, Xi_matrix])
+    
+    return Tglobal_new
+    
+def c_total(Tglobal_new, c1_plus, c1_minus):
+       
+    T11 = Tglobal_new[0:2*N+1,0:2*N+1]
+    T12 = Tglobal_new[2*N+1:4*N+2,0:2*N+1]
+    T21 = Tglobal_new[0:2*N+1,2*N+1:4*N+2]
+    T22 = Tglobal_new[2*N+1:4*N+2,2*N+1:4*N+2]
+    
+    cout_plus = np.add(np.matmul(T11, c1_plus), np.matmul(T12, c1_minus))
+    cout_minus = np.add(np.matmul(T21, c1_plus), np.matmul(T22, c1_minus))
+    
+    return cout_plus, cout_minus
+
+def check(check_plus, check_minus):
+    for i in range (np.size(check_plus, 1)-1):
+        if np.add((np.power(np.linalg.norm(check_plus[:, i+1]), 2)),(np.power(np.linalg.norm(check_minus[:, i]), 2))) <= np.add((np.power(np.linalg.norm(check_plus[:, i]), 2)),(np.power(np.linalg.norm(check_minus[:, i+1]), 2))):
+            print("good")
+            #print (np.add((np.power(np.linalg.norm(c_plus[:, i+1]), 2)),(np.power(np.linalg.norm(c_minus[:, i]), 2))))
+            #print (np.add((np.power(np.linalg.norm(c_plus[:, i]), 2)),(np.power(np.linalg.norm(c_minus[:, i+1]), 2))))
+        else:
+            print ("start crying")   
+            print (np.add((np.power(np.linalg.norm(c_plus[:, i+1]), 2)),(np.power(np.linalg.norm(c_minus[:, i]), 2))))
+            print (np.add((np.power(np.linalg.norm(c_plus[:, i]), 2)),(np.power(np.linalg.norm(c_minus[:, i+1]), 2))))
+    return
+
+
 # Calculate the eigenvalues and eigenvectors for every layer
-Q2 = np.zeros((2*N+1), dtype=np.cdouble)                    # Memory allocation
-W  = np.zeros((2*N+1, 2*N+1,Nlt), dtype=np.cdouble)         # Memory allocation
-Q  = np.zeros((2*N+1, Nlt), dtype=np.cdouble)               # Memory allocation
+Q2 = np.zeros((2*N+1), dtype=np.complex64)                    # Memory allocation
+W  = np.zeros((2*N+1, 2*N+1,Nlt), dtype=np.complex64)         # Memory allocation
+Q  = np.zeros((2*N+1, Nlt), dtype=np.complex64)               # Memory allocation
+Tbar  = np.zeros((4*N+2, 4*N+2, Nlt-1), dtype=np.complex64)  # Memory allocation
+Tglobal  = np.zeros((4*N+2, 4*N+2, Nlt-1), dtype=np.complex64)
 
 for i in range(Nlt):
     Q2, W[:,:,i] = np.linalg.eig(A[:,:,i])                  # Eigenvalues Q2 and eigenvectors W for layer i
     Q[:,i] = np.sqrt(Q2)                                    # Calculate Q as square root of eigenvalues
 
 T = Tmatrix(W[:,:,0],Q[:,0],W[:,:,1],Q[:,1])                # Use W and Q of layer 0 and 1 to compute the Tbar0,1 matrix
+Tbar[:, :, 0] = T
 Sglobal = TtoS(T,Q[:,0],Q[:,1])                             # Convert the Tbar0,1 matrix to S0,1 and call it the global S matrix
 
-for i in range(1,Nlt-1):                                    # For all layers
+for i in range(1, Nlt-1):                                    # For all layers
     T = Tmatrix(W[:,:,i],Q[:,i],W[:,:,i+1],Q[:,i+1])        # Convert to Tbari,i+1 matrix
+    Tbar[:,:,i] = T
     S = TtoS(T,Q[:,i],Q[:,i+1])                             # Compute Si,i+1
     Sglobal = Redheffer(Sglobal,S)                          # Use Redheffer to compute S1,i+1
-    Sglobal_total = Sglobal[:,:,i] #When computing Sglobal he finds the harmonics
 
-c1_plus = np.zeros((2*N+1))
-c1_plus[N] = 1
-c_min = np.zeros((2*N+1))
-r = np.matmul(Sglobal[2],c1_plus)
-t = np.matmul(Sglobal[0],c1_plus)
+c_plus = np.zeros((2*N+1, Nlt), dtype=np.complex64)         # Memory allocation
+c_minus = np.zeros((2*N+1, Nlt), dtype=np.complex64)        # Memory allocation
+c_plus[:, 0] = np.ones((2*N+1))  
+c_plus[:,Nlt-1], c_minus[:,0] = c_variables(Sglobal, c_plus[:,0], c_minus[:, Nlt-1])
+
+                          # Input of C plus matrix (ones)
+Tglobal[:,:, 0] = TbartoT(Tglobal[:,:, 0], Tbar[:,:,0], Q[:,0], Q[:,1])
+for i in range(Nl):
+    Tglobal[:,:, i+1] = TbartoT(Tglobal[:,:, i], Tbar[:,:, i], Q[:,i], Q[:,i+1])
+
+
+
+for i in range(Nl):
+    c_plus[:,i+1], c_minus[:,i+1] = c_total(Tglobal[:,:, i], c_plus[:,0], c_minus[:,0])
+check (c_plus, c_minus)
+
+r = np.matmul(Sglobal[2],c_plus[:, 0])
+t = np.matmul(Sglobal[0],c_plus[:, 0])
+
 
 #Function to find layer and heights of z-boundaries
 def FindLayer(Height):
@@ -160,14 +230,14 @@ def FindLayer(Height):
         if Height<= H/Nl*i:         #Check whether given height is below boundary
             z_begin = H/Nl*(i-1)    #Calcs the lower boundary z
             z_next  = H/Nl*i        #Calcs the upper boundary z
-            return i,z_begin,z_next
+            return i-1,z_begin,z_next
         
         
 #Function to calculate the E-field given a certain position in z and x with each mode
 def EVisual(r,t,c_plus,c_min):
     z   = np.arange(start = z_start, stop = z_stop, step = (z_stop-z_start)/(accuracy))   #Defines the z axis
     x   = np.arange(start = -p/2,stop = p/2, step = p/accuracy)           #Defines the x axis
-    E_vis  = np.zeros((z.size,x.size), dtype=np.cdouble)             #Memory allocation for E_vis
+    E_vis  = np.zeros((z.size,x.size), dtype=np.complex64)             #Memory allocation for E_vis
     for l in range(x.size):             #Makes the range for all x
         
         for j in range(z.size):         #Makes the range for all z
@@ -187,8 +257,8 @@ def EVisual(r,t,c_plus,c_min):
                     for k in range(2*N+1):          #Makes loop for all modes in other direction
                         
                         # kz_n_grat = np.sqrt([(k_0*k_0*e0*e1 - Kx[i]*Kx[i]),(1-1j)])  
-                        E_vis[j,l] = (W[i,k,layer]*np.exp(-1*k_0*Q[k,layer]*(z[j]-z0))*c_plus[layer] 
-                        + c_min[layer]*np.exp(-k_0*Q[k,layer]*(z[j]-z1)))*np.exp(-1j*Kx[i]*x[l]) #Calculates E field each mode
+                        E_vis[j,l] = (W[i,k,layer]*np.exp(-1*k_0*Q[k,layer]*(z[j]-z0))*c_plus[i,layer] 
+                        + c_min[i,layer]*np.exp(k_0*Q[k,layer]*(z[j]-z1)))*np.exp(-1j*Kx[i]*x[l]) #Calculates E field each mode
                         
                         E_vis[j,l] += E_vis[j,l]        #Addition to get E_vis for each mode on a position 
                         
@@ -201,7 +271,7 @@ def EVisual(r,t,c_plus,c_min):
                 
     return E_vis
 
-Efield = EVisual(r,t,c1_plus,c_min)         
+Efield = EVisual(r,t,c_plus,c_minus)         
 z   = np.arange(start = z_start, stop = z_stop, step = (z_stop-z_start)/(accuracy))   #Defines the z axis
 x   = np.arange(start = -p/2,stop = p/2, step = p/100)           #Defines the x axis
     
@@ -232,7 +302,7 @@ def heatmapEfield(Efield):
         ax.add_patch(rect)
     # plt.plot( c='g',zorder=10)
     hm = ax.matshow(Efield,cmap ='inferno')
-    ax.imshow(Efield, extent=[-p/2,p/2,H,0])
+    # ax.imshow(Efield, extent=[-p/2,p/2,H,0])
     nx = x.shape[0]
     no_xlabels = 5 # how many labels visible on the x axis
     step_x = int(nx/(no_xlabels-1)) # step between consecutive labels
@@ -254,5 +324,5 @@ def heatmapEfield(Efield):
     figure.colorbar(hm)
     plt.show()
 
-# heatmap2d(np.abs(Efield))
+heatmap2d(np.abs(Efield))
 heatmapEfield(np.abs(Efield))

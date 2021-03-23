@@ -206,8 +206,8 @@ c_plus[:,Nlt-1], c_minus[:,0] = c_variables(Sglobal, c_plus[:,0], c_minus[:, Nlt
                           # Input of C plus matrix (ones)
 Tglobal[:,:, 0] = TbartoT(Tglobal[:,:, 0], Tbar[:,:,0], Q[:,0], Q[:,1])
 
-for i in range(1, Nlt-1):
-    Tglobal[:,:, i] = TbartoT(Tglobal[:,:, i-1], Tbar[:,:, i], Q[:,i-1], Q[:,i])
+for i in range(Nlt-1):
+    Tglobal[:,:, i+1] = TbartoT(Tglobal[:,:, i], Tbar[:,:, i], Q[:,i], Q[:,i+1])
 
 
     
