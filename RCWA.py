@@ -9,7 +9,7 @@ PI = 3.14159265358979323846
 # Inputs #####################################################################
 theta_inc = 30.; lambda_0 = 0.02;   # Angle of incidence and wavelength of incident light
 p = 1.;                           # Grating period
-alpha_l = 30.; alpha_r = 10.;      # Blazing and anti-blazing angle in degrees
+alpha_l = 30.; alpha_r = 20.;      # Blazing and anti-blazing angle in degrees
 d = 0.3;                         # Width of top cut
 e0 = 1.; e1 = 2.;  e2 =1.1;        # Dielectric permitivity of surrounding medium and grating
 
