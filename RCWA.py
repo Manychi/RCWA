@@ -7,14 +7,14 @@ from functools import reduce # only in Python 3
 PI = 3.14159265359
 
 # Inputs
-theta_inc = 30; lambda_0 = 2;   # Angle of incidence and wavelength of incident light
+theta_inc = 40; lambda_0 = 1;   # Angle of incidence and wavelength of incident light
 p = 1;                          # Grating period
-alpha_l = 30; alpha_r = 30;     # Blazing and anti-blazing angle in degrees
+alpha_l = 80; alpha_r = 10;     # Blazing and anti-blazing angle in degrees
 d = 0.5;                        # Width of top cut
-e0 = 1.2; e1 = 2;  e2 =1.1;     # Dielectric permitivity of surrounding medium and grating
+e0 = 1; e1 = 2;  e2 =1.1;     # Dielectric permitivity of surrounding medium and grating
 
-N = 5;                         # Number of harmonics
-Nl = 5;                        # Number of layers excluding sub- and superstrate layers
+N = 1;                         # Number of harmonics
+Nl = 15;                        # Number of layers excluding sub- and superstrate layers
 Nlt = Nl+2;                     # Total number of layers including sub- and superstrate layers
 accuracy = 100                  # Accuracy to determine the figure steps
 # Geometry definition
@@ -28,7 +28,7 @@ z_start = -H/2      # Measure from which the plot starts
 z_stop  = 1.5*H     # Measure at which height the plot ends
 
 
-#Format for complex values: numpy.complex128 or numpy.clongdouble
+#Format for complex values: numpy.complex128 
 # Draw Geometry
 figure, ax = plt.subplots(1)    # Make a plot
 
@@ -46,7 +46,6 @@ plt.show()                      # Show plot
 
 # Find Kx2 array
 k_0 = 2*PI/lambda_0                 # Find k0 from inputs
-k_0=1
 kinc_x = k_0*np.cos(theta_inc)      # Find the x component from the incident wave
 n = np.arange(-N,N+1)               # Define the range of n
 Kx = kinc_x-2*PI*n/p                # 
@@ -293,20 +292,22 @@ def GetTickValues(array,nrlabels):
     
 def heatmapEfield(Efield):
     figure, ax = plt.subplots(1)
-    
+    nx = x.shape[0]
+    no_xlabels = 5 
     for i in range(Nl):             # Draw the rectangular slices
-        rect = patches.Rectangle((Sl[Nl-1-i]*x.size+x.size/2, (i)*z.size/(Nlt)+(z_stop-z_start)/(2*H*Nlt)*z.size), 
-                                 (-Sl[Nl-1-i] + Sr[Nl-1-i])*x.size, (z.size)/Nlt ,
-                                 edgecolor='b',facecolor="none")
-        print((i)*z.size/Nlt ,np.around(((z.size)/Nlt)/Nl,2))
+        pos_y = i*H/(z_stop-z_start)*z.size/Nl+int(nx/(no_xlabels-1))
+        pos_y_diff = H/(z_stop-z_start)*(z.size)/Nl
+        rect = patches.Rectangle((Sl[Nl-1-i]*x.size+x.size/2, pos_y), 
+                                 (-Sl[Nl-1-i] + Sr[Nl-1-i])*x.size, pos_y_diff ,
+                                 edgecolor='r',facecolor="none")
+        print(pos_y,np.around(pos_y_diff,2))
         ax.add_patch(rect)
-    # plt.plot( c='g',zorder=10)
     hm = ax.matshow(Efield,cmap ='inferno')
     # ax.imshow(Efield, extent=[-p/2,p/2,H,0])
     nx = x.shape[0]
-    no_xlabels = 5 # how many labels visible on the x axis
-    step_x = int(nx/(no_xlabels-1)) # step between consecutive labels
-    x_positions = np.arange(0,nx,step_x-1/no_xlabels) # pixel count at label position
+    no_xlabels = 5                                      # how many labels visible on the x axis
+    step_x = int(nx/(no_xlabels-1))                     # step between consecutive labels
+    x_positions = np.arange(0,nx,step_x-1/no_xlabels)   # pixel count at label position
     x_labels = np.around(x[::step_x],2) # labels you want to see
     x_labels = np.append(x_labels,p/2)
     ny = z.shape[0]
@@ -325,4 +326,4 @@ def heatmapEfield(Efield):
     plt.show()
 
 heatmap2d(np.abs(Efield))
-heatmapEfield(np.abs(Efield))
+heatmapEfield(np.imag(Efield))
